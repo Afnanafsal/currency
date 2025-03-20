@@ -4,7 +4,7 @@ import 'package:camera/camera.dart';
 import 'package:currency/color_service.dart';
 import 'package:currency/ocr_service.dart';
 import 'package:currency/tflite_service.dart';
-import 'package:currency/tts_service.dart';
+import 'tts_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -43,7 +43,7 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image.asset('assets/logo.png', height: 150), // Your app logo
+            Image.asset('assets/logo.jpg', height: 150), // Your app logo
             const SizedBox(height: 20),
             const Text(
               "Advanced Currency Detector",
@@ -78,7 +78,6 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// Home Screen
 class HomeScreen extends StatefulWidget {
   final List<CameraDescription> cameras;
   const HomeScreen({super.key, required this.cameras});
@@ -90,6 +89,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late CameraController _cameraController;
   bool _isCameraInitialized = false;
+  String result = "Place currency inside the box";
   String _result = "";
 
   final TTSService _ttsService = TTSService();
@@ -130,7 +130,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       debugPrint("📷 Captured Image: ${image.path}");
 
-      // Run AI, OCR, and Color Detection
+      // Run AI, OCR, and Color Detection in parallel
       final results = await Future.wait([
         _tfliteService.detectCurrencyWithConfidence(image),
         _ocrService.extractCurrencyText(image),
@@ -145,22 +145,35 @@ class _HomeScreenState extends State<HomeScreen> {
       String? ocrResult = results[1] as String?;
       String? colorResult = results[2] as String?;
 
-      // Determine final result
+      // Log results
+      debugPrint(
+        "🤖 AI Model Result: $aiResult (Confidence: ${aiConfidence.toStringAsFixed(2)})",
+      );
+      debugPrint("📝 OCR Result: ${ocrResult ?? "❌ OCR Failed"}");
+      debugPrint(
+        "🎨 Color Detection Result: ${colorResult ?? "❌ Color Failed"}",
+      );
+
+      // Determine final result based on priority order
       String finalResult = "";
 
       if (ocrResult == colorResult && ocrResult != null) {
+        // ✅ OCR and Color match → Confirm currency
         finalResult = ocrResult;
       } else if (aiConfidence > 0.75 &&
           aiResult == ocrResult &&
           aiResult == colorResult) {
+        // ✅ AI, OCR, and Color all match → Confirm currency
         finalResult = aiResult;
       } else if (ocrResult != null) {
+        // ✅ OCR detected but no color match → Use OCR as final result
         finalResult = ocrResult;
       } else if (colorResult != null) {
+        // ✅ Only Color detected → Use it as a last resort
         finalResult = colorResult;
       }
 
-      // Display result
+      // Display final result
       if (finalResult.isNotEmpty) {
         _result = "Detected Currency: $finalResult";
         _ttsService.speak(_result);
@@ -230,6 +243,8 @@ class _HomeScreenState extends State<HomeScreen> {
           _isCameraInitialized
               ? CameraPreview(_cameraController)
               : const Center(child: CircularProgressIndicator()),
+
+          // Camera Overlay Guide
           Positioned(
             top: MediaQuery.of(context).size.height * 0.3,
             left: 30,
@@ -240,26 +255,64 @@ class _HomeScreenState extends State<HomeScreen> {
                 border: Border.all(color: Colors.red, width: 3),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Center(
+              child: Center(
                 child: Text(
                   "Align currency inside the box",
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: Colors.red,
+                    backgroundColor: Colors.white70,
                   ),
                 ),
               ),
             ),
           ),
+
+          // Capture Button
           Align(
             alignment: Alignment.bottomCenter,
-            child: ElevatedButton.icon(
-              onPressed: _captureAndDetect,
-              icon: const Icon(Icons.camera_alt, size: 40),
-              label: const Text(
-                "Scan Currency",
-                style: TextStyle(fontSize: 24),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: ElevatedButton.icon(
+                onPressed: _captureAndDetect,
+                icon: const Icon(Icons.camera_alt, size: 40),
+                label: const Text(
+                  "Scan Currency",
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                ),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 20,
+                    horizontal: 40,
+                  ),
+                  minimumSize: const Size(250, 80),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Result Display with Animation
+          Positioned(
+            bottom: 100,
+            left: 0,
+            right: 0,
+            child: AnimatedOpacity(
+              duration: const Duration(seconds: 1),
+              opacity: _result.isEmpty ? 0.0 : 1.0,
+              child: Center(
+                child: Text(
+                  _result,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    backgroundColor: Colors.black54,
+                  ),
+                ),
               ),
             ),
           ),

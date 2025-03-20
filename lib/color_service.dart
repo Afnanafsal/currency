@@ -71,7 +71,7 @@ class ColorService {
         debugPrint(
           "✅ Matched with $bestMatch (Diff: $lowestDifference) using color R${matchedColor[0]}, G${matchedColor[1]}, B${matchedColor[2]}",
         );
-        return "$bestMatch )";
+        return "$bestMatch";
       }
 
       debugPrint("❌ No Reliable Color Match Found");
