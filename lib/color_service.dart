@@ -12,6 +12,11 @@ class ColorService {
       [224, 187, 106], // Yellow-Brown
       [201, 165, 111], // Light Brown
     ],
+"₹50": [
+  [119, 187, 218], // Sky Blue
+  [95, 155, 202],  // Medium Blue
+  [56, 116, 162],  // Deep Blue
+],
 
     "₹100": [
       [170, 219, 220],
@@ -29,9 +34,7 @@ class ColorService {
     "₹2000": [
       [157, 105, 172], // Magenta
     ],
-    "₹1000": [
-      [186, 138, 106], // Brownish-Red (Discontinued)
-    ],
+    
   };
 
   Future<String?> detectCurrencyColor(File image) async {

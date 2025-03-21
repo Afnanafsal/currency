@@ -12,6 +12,15 @@ void main() async {
   runApp(MyApp(cameras: cameras));
 }
 
+const Map<String, String> languages = {
+  "English": "en-US",
+  "Malayalam": "ml-IN",
+  "Hindi": "hi-IN",
+  "Tamil": "ta-IN",
+  "Kannada": "kn-IN",
+  "Telugu": "te-IN",
+};
+
 class MyApp extends StatelessWidget {
   final List<CameraDescription> cameras;
   const MyApp({super.key, required this.cameras});
@@ -39,6 +48,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late CameraController _cameraController;
   bool _isCameraInitialized = false;
   String _result = "";
+  String _selectedLanguage = "ml-IN"; // Default to Malayalam
 
   final TTSService _ttsService = TTSService();
   final TFLiteService _tfliteService = TFLiteService();
@@ -151,11 +161,14 @@ class _HomeScreenState extends State<HomeScreen> {
       if (finalResult != null) {
         print("✅ Confirmed Currency: $finalResult");
         _result = "Detected Currency: $finalResult";
-        _ttsService.speak(_result);
+        _ttsService.speak(_result, _selectedLanguage);
       } else {
         print("❌ No currency detected.");
         _result = "❌ No Currency Detected";
-        _ttsService.speak("No currency detected. Please try again.");
+        _ttsService.speak(
+          "No currency detected. Please try again.",
+          _selectedLanguage,
+        );
       }
 
       setState(() {});
@@ -171,20 +184,55 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text(
           "Currency Detector",
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(color: Colors.white, fontSize: 16),
         ),
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: [
+          // Language selection dropdown
+          DropdownButton<String>(
+            value: _selectedLanguage,
+            icon: const Icon(Icons.language, color: Colors.white, size: 16),
+            dropdownColor: Colors.black,
+            underline: SizedBox(), // Remove the underline
+            items:
+                languages.entries.map((entry) {
+                  return DropdownMenuItem(
+                    value: entry.value,
+                    child: Row(
+                      children: [
+                        // Adjust spacing between icon and text
+                        Text(
+                          entry.key,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14, // Added font size
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+            onChanged: (String? newValue) {
+              if (newValue != null) {
+                setState(() {
+                  _selectedLanguage = newValue;
+                });
+              }
+            },
+          ),
+        ],
       ),
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
             const DrawerHeader(
-              decoration: BoxDecoration(color: Colors.blueAccent),
+              decoration: BoxDecoration(color: Colors.black),
               child: Text(
                 "About Us",
+                textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
@@ -219,43 +267,21 @@ class _HomeScreenState extends State<HomeScreen> {
           _isCameraInitialized
               ? CameraPreview(_cameraController)
               : const Center(child: CircularProgressIndicator()),
-          Positioned(
-            top: MediaQuery.of(context).size.height * 0.3,
-            left: 30,
-            right: 30,
-            child: Container(
-              height: 200,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.red, width: 3),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Center(
-                child: Text(
-                  "Align currency inside the box",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.red,
-                    backgroundColor: Colors.white70,
-                  ),
-                ),
-              ),
-            ),
-          ),
+
           Align(
             alignment: Alignment.bottomCenter,
             child: Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(0.0),
               child: ElevatedButton.icon(
                 onPressed: _captureAndDetect,
-                icon: const Icon(Icons.camera_alt, size: 40),
+                icon: const Icon(Icons.camera_alt, size: 84),
                 label: const Text(
                   "Scan Currency",
                   style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                 ),
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(
-                    vertical: 20,
+                    vertical: 36,
                     horizontal: 40,
                   ),
                   minimumSize: const Size(250, 80),
@@ -271,16 +297,20 @@ class _HomeScreenState extends State<HomeScreen> {
             left: 0,
             right: 0,
             child: AnimatedOpacity(
-              duration: const Duration(seconds: 1),
+              duration: const Duration(milliseconds: 800),
               opacity: _result.isEmpty ? 0.0 : 1.0,
-              child: Center(
-                child: Text(
-                  _result,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    backgroundColor: Colors.black54,
+              child: AnimatedPadding(
+                duration: const Duration(milliseconds: 800),
+                padding: EdgeInsets.only(bottom: _result.isEmpty ? 0 : 100),
+                child: Center(
+                  child: Text(
+                    _result,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      backgroundColor: Colors.black54,
+                    ),
                   ),
                 ),
               ),
