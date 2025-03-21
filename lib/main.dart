@@ -129,7 +129,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
       String? finalResult;
 
-      /// ✅ **1. If AI, OCR, and Color agree, confirm the currency**
+      /// ✅ **1. If the detected color exactly matches a predefined currency color, confirm immediately.**
+
+      /// ✅ **2. If AI, OCR, and Color agree, confirm the currency**
       if (isValidCurrency(aiResult) &&
           isValidCurrency(ocrResult) &&
           isValidCurrency(colorResult) &&
@@ -137,21 +139,25 @@ class _HomeScreenState extends State<HomeScreen> {
           ocrResult == colorResult) {
         finalResult = aiResult;
       }
-      /// ✅ **2. If AI confidence is high (≥ 0.85) but OCR is different, trust OCR**
+      /// ✅ **3. If AI confidence is high (≥ 0.85) but OCR is different, trust OCR**
       else if (isValidCurrency(ocrResult) && aiConfidence >= 0.85) {
         finalResult = ocrResult;
       }
-      /// ✅ **3. If only OCR and Color match, use them**
+      /// ✅ **4. If only OCR and Color match, use them**
       else if (isValidCurrency(ocrResult) &&
           isValidCurrency(colorResult) &&
           ocrResult == colorResult) {
         finalResult = ocrResult;
       }
-      /// ✅ **4. If only OCR is valid and AI has some result, use OCR**
+      /// ✅ **5. If only OCR is valid and AI has some result, use OCR**
       else if (isValidCurrency(ocrResult) && isValidCurrency(aiResult)) {
         finalResult = ocrResult;
       }
-      /// ❌ **If nothing is valid, reject detection**
+      /// ✅ **6. If OCR fails but Color detection is valid, use Color**
+      else if (ocrResult == null && isValidCurrency(colorResult)) {
+        finalResult = colorResult;
+      }
+      /// ❌ **7. If nothing is valid, reject detection**
       else {
         finalResult = null;
       }
