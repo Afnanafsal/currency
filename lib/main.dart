@@ -12,57 +12,6 @@ void main() async {
   runApp(MyApp(cameras: cameras));
 }
 
-// Splash Screen
-class SplashScreen extends StatefulWidget {
-  final List<CameraDescription> cameras;
-  const SplashScreen({super.key, required this.cameras});
-
-  @override
-  _SplashScreenState createState() => _SplashScreenState();
-}
-
-class _SplashScreenState extends State<SplashScreen> {
-  @override
-  void initState() {
-    super.initState();
-    Future.delayed(const Duration(seconds: 3), () {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => HomeScreen(cameras: widget.cameras),
-        ),
-      );
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.blueAccent,
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Image.asset('assets/logo.jpg', height: 150), // Your app logo
-            const SizedBox(height: 20),
-            const Text(
-              "Advanced Currency Detector",
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 10),
-            const CircularProgressIndicator(color: Colors.white),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// Main App
 class MyApp extends StatelessWidget {
   final List<CameraDescription> cameras;
   const MyApp({super.key, required this.cameras});
@@ -73,7 +22,7 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Currency Detector',
       theme: ThemeData.dark(),
-      home: SplashScreen(cameras: cameras),
+      home: HomeScreen(cameras: cameras),
     );
   }
 }
@@ -89,7 +38,6 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late CameraController _cameraController;
   bool _isCameraInitialized = false;
-  String result = "Place currency inside the box";
   String _result = "";
 
   final TTSService _ttsService = TTSService();
@@ -118,6 +66,24 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  bool isValidCurrency(String? text) {
+    if (text == null) return false;
+    List<String> validDenominations = [
+      "10",
+      "20",
+      "50",
+      "100",
+      "200",
+      "500",
+      "2000",
+    ];
+
+    // Remove unwanted characters and trim spaces
+    String sanitizedText = text.replaceAll(RegExp(r'[^0-9]'), '').trim();
+
+    return validDenominations.contains(sanitizedText);
+  }
+
   Future<void> _captureAndDetect() async {
     if (!_isCameraInitialized || !_tfliteService.isModelLoaded) {
       setState(() => _result = "❌ AI Model Not Loaded!");
@@ -130,14 +96,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
       debugPrint("📷 Captured Image: ${image.path}");
 
-      // Run AI, OCR, and Color Detection in parallel
       final results = await Future.wait([
         _tfliteService.detectCurrencyWithConfidence(image),
         _ocrService.extractCurrencyText(image),
         _colorService.detectCurrencyColor(image),
       ]);
 
-      // Extract results
       var aiResponse = results[0] as Map<String, dynamic>;
       String aiResult = aiResponse['currency'] ?? "";
       double aiConfidence = aiResponse['confidence'] ?? 0.0;
@@ -145,7 +109,6 @@ class _HomeScreenState extends State<HomeScreen> {
       String? ocrResult = results[1] as String?;
       String? colorResult = results[2] as String?;
 
-      // Log results
       debugPrint(
         "🤖 AI Model Result: $aiResult (Confidence: ${aiConfidence.toStringAsFixed(2)})",
       );
@@ -154,30 +117,43 @@ class _HomeScreenState extends State<HomeScreen> {
         "🎨 Color Detection Result: ${colorResult ?? "❌ Color Failed"}",
       );
 
-      // Determine final result based on priority order
-      String finalResult = "";
+      String? finalResult;
 
-      if (ocrResult == colorResult && ocrResult != null) {
-        // ✅ OCR and Color match → Confirm currency
-        finalResult = ocrResult;
-      } else if (aiConfidence > 0.75 &&
+      /// ✅ **1. If AI, OCR, and Color agree, confirm the currency**
+      if (isValidCurrency(aiResult) &&
+          isValidCurrency(ocrResult) &&
+          isValidCurrency(colorResult) &&
           aiResult == ocrResult &&
-          aiResult == colorResult) {
-        // ✅ AI, OCR, and Color all match → Confirm currency
+          ocrResult == colorResult) {
         finalResult = aiResult;
-      } else if (ocrResult != null) {
-        // ✅ OCR detected but no color match → Use OCR as final result
+      }
+      /// ✅ **2. If AI confidence is high (≥ 0.85) but OCR is different, trust OCR**
+      else if (isValidCurrency(ocrResult) && aiConfidence >= 0.85) {
         finalResult = ocrResult;
-      } else if (colorResult != null) {
-        // ✅ Only Color detected → Use it as a last resort
-        finalResult = colorResult;
+      }
+      /// ✅ **3. If only OCR and Color match, use them**
+      else if (isValidCurrency(ocrResult) &&
+          isValidCurrency(colorResult) &&
+          ocrResult == colorResult) {
+        finalResult = ocrResult;
+      }
+      /// ✅ **4. If only OCR is valid and AI has some result, use OCR**
+      else if (isValidCurrency(ocrResult) && isValidCurrency(aiResult)) {
+        finalResult = ocrResult;
+      }
+      /// ❌ **If nothing is valid, reject detection**
+      else {
+        finalResult = null;
       }
 
-      // Display final result
-      if (finalResult.isNotEmpty) {
+      debugPrint("✅ Currency detected: ${finalResult ?? "None"}");
+
+      if (finalResult != null) {
+        print("✅ Confirmed Currency: $finalResult");
         _result = "Detected Currency: $finalResult";
         _ttsService.speak(_result);
       } else {
+        print("❌ No currency detected.");
         _result = "❌ No Currency Detected";
         _ttsService.speak("No currency detected. Please try again.");
       }
@@ -243,8 +219,6 @@ class _HomeScreenState extends State<HomeScreen> {
           _isCameraInitialized
               ? CameraPreview(_cameraController)
               : const Center(child: CircularProgressIndicator()),
-
-          // Camera Overlay Guide
           Positioned(
             top: MediaQuery.of(context).size.height * 0.3,
             left: 30,
@@ -268,8 +242,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
-
-          // Capture Button
           Align(
             alignment: Alignment.bottomCenter,
             child: Padding(
@@ -294,8 +266,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
-
-          // Result Display with Animation
           Positioned(
             bottom: 100,
             left: 0,
